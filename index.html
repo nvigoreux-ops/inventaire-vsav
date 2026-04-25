@@ -5,28 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com"></script>
     <title>Inventaire Matériel - Caserne</title>
+    <style>
+        /* Style pour la fenêtre récapitulative */
+        #summaryModal.active { display: flex; }
+    </style>
 </head>
 <body class="bg-slate-100 pb-24 font-sans">
 
     <div class="bg-red-700 text-white p-5 shadow-lg sticky top-0 z-50 flex flex-col items-center">
         <h1 class="text-lg font-black uppercase tracking-tighter italic">🚒 GESTION DES INVENTAIRES</h1>
         
-        <select id="vehicleSelector" class="mt-3 w-full max-w-xs bg-red-800 border border-red-400 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-white">
+        <select id="vehicleSelector" name="VÉHICULE" class="mt-3 w-full max-w-xs bg-red-800 border border-red-400 text-white text-sm rounded-lg p-2.5 outline-none focus:ring-2 focus:ring-white">
             <option value="VSAV">VSAV HAROUÉ</option>
             <option value="CTU">CTU HAROUÉ</option>
         </select>
     </div>
 
     <div class="max-w-md mx-auto px-4 mt-6">
-        <form id="inventoryForm">
+        <form id="inventoryForm" action="https://formspree.io/f/xaqakwbn" method="POST">
+            
+            <input type="hidden" name="_replyto" value="nathan.vigoreux@sdis54.fr">
+            
             <div id="accordionContainer" class="space-y-4"></div>
 
-            <div class="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 text-center">
-                <button type="submit" class="w-full max-w-md mx-auto block bg-red-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-transform uppercase">
-                    Valider l'inventaire <span id="btnVehicleName">VSAV</span>
+            <div class="mt-8 mb-6">
+                <label class="block text-xs font-black text-slate-500 uppercase mb-2 ml-2">Observations / Matériel Manquant :</label>
+                <textarea id="globalComment" name="OBSERVATIONS" rows="3" 
+                    class="w-full rounded-2xl border-slate-200 border p-4 text-sm shadow-sm focus:ring-2 focus:ring-red-600 outline-none transition-all bg-white"
+                    placeholder="RAS, matériel manquant, péremptions..."></textarea>
+            </div>
+
+            <div class="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-md border-t border-slate-200 text-center z-40">
+                <button type="button" onclick="genererBilan()" class="w-full max-w-md mx-auto block bg-red-600 text-white font-black py-4 rounded-2xl shadow-xl active:scale-95 transition-transform uppercase">
+                    Valider et Envoyer <span id="btnVehicleName">VSAV</span>
                 </button>
             </div>
         </form>
+    </div>
+
+    <div id="summaryModal" class="hidden fixed inset-0 bg-slate-900/80 z-[60] flex-col items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="bg-slate-800 text-white p-5 text-center">
+                <h2 class="font-black uppercase italic text-red-500">Bilan des manquants</h2>
+                <p class="text-[10px] text-slate-400 uppercase mt-1">Vérification avant envoi</p>
+            </div>
+            <div id="summaryContent" class="p-6 overflow-y-auto text-sm space-y-3 bg-slate-50"></div>
+            <div class="p-4 border-t flex gap-3 bg-white">
+                <button onclick="fermerBilan()" class="flex-1 bg-slate-200 text-slate-700 font-bold py-3 rounded-xl uppercase text-xs">Modifier</button>
+                <button onclick="envoyerFormulaire()" class="flex-1 bg-red-600 text-white font-black py-3 rounded-xl uppercase text-xs shadow-lg shadow-red-200">Confirmer l'envoi</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -35,67 +63,186 @@
                 "POSTE DE CONDUITE": [
                     { nom: "HACHETTE BSPP", max: 1, type: "toggle" },
                     { nom: "TPH 700", max: 1, type: "toggle" },
-                    { nom: "TELEPHONE PORTABLE VSAV", max: 1, type: "toggle" }, 
+                    { nom: "TÉLÉPHONE PORTABLE VSAV", max: 1, type: "toggle" }, 
                     { nom: "TABLETTE EXAMEN", max: 1, type: "toggle" },
-                    { nom: "BOUEE FER A CHEVAL", max: 1, type: "toggle" },
+                    { nom: "BOUÉE FER À CHEVAL", max: 1, type: "toggle" },
                     { nom: "CALE DE ROUE", max: 1, type: "toggle" }, 
                     { nom: "CARNET DE BORD", max: 1, type: "toggle" }, 
-                    { nom: "CLES D'ACCES DE SECTEUR", max: 1, type: "toggle" }
+                    { nom: "CLÉS D'ACCÈS DE SECTEUR", max: 1, type: "toggle" }
                 ],
-                "BOITE A GANTS": [
+                "BOÎTE À GANTS": [
                     { nom: "LOT HBCO", max: 1, type: "toggle" },
-                    { nom: "ADAPTATEUR POUR DETECTEUR CO + TUBULURE", max: 1, type: "toggle" },
-                    { nom: "EMBOUTS A USAGE UNIQUE", max: 10, type: "number" }
+                    { nom: "ADAPTATEUR POUR DÉTECTEUR CO + TUBULURE", max: 1, type: "toggle" },
+                    { nom: "EMBOUTS À USAGE UNIQUE", max: 10, type: "number" }
                 ],
-                "PORTE LATERALE": [
-                    { nom: "MATELAS IMMOBILISATEUR A DEPRESSION + POMPE", max: 1, type: "toggle" },
+                "PORTE LATÉRALE": [
+                    { nom: "MATELAS IMMOBILISATEUR À DÉPRESSION + POMPE", max: 1, type: "toggle" },
                     { nom: "BOUTEILLE D'EAU 50cl", max: 6, type: "number" },
                     { nom: "PORTOIR SOUPLE", max: 1, type: "toggle" },
                     { nom: "CASQUE F2", max: 3, type: "number" },
                     { nom: "KIT SURCOTTES", max: 1, type: "toggle" },
-                    { nom: "SUR CHAUSSURES", max: 4, type: "number" },
-                    { nom: "SUR BLOUSES", max: 4, type: "number" },
-                    { nom: "SUR BOTTES", max: 4, type: "number" },
-                    { nom: "PETIT COUPE BOULON", max: 1, type: "toggle" },
-                    { nom: "OUTIL FENETRE (TUBE PVC + CORDELETTE)", max: 1, type: "toggle" },
-                    { nom: "SACCOCHE EXAMEN", max: 1, type: "toggle" }
+                    { nom: "SUR-CHAUSSURES", max: 4, type: "number" },
+                    { nom: "SUR-BLOUSES", max: 4, type: "number" },
+                    { nom: "SUR-BOTTES", max: 4, type: "number" },
+                    { nom: "PETIT COUPE-BOULON", max: 1, type: "toggle" },
+                    { nom: "OUTIL FENÊTRE", max: 1, type: "toggle" },
+                    { nom: "SACOCHE EXAMEN", max: 1, type: "toggle" }
                 ],
                 "CELLULE": [
-                    { nom: "BOITE DE GANTS TAILLE 6/7 (S)", max: 1, type: "toggle" },
-                    { nom: "BOITE DE GANTS TAILLE 7/8 (M)", max: 1, type: "toggle" },
-                    { nom: "BOITE DE GANTS TAILLE 8/9 (L)", max: 1, type: "toggle" },
-                    { nom: "BOITE DE GANTS TAILLE 9/10 (XL)", max: 1, type: "toggle" },
-                    { nom: "DISRIBUTEUR AVEC PAPIER ESSUIE-TOT", max: 1, type: "toggle" },
-                    { nom: "COLLECTEUR D'AIGUILLES 1L", max: 1, type: "toggle" },
-                    { nom: "BRANCARD NORMALISE", max: 1, type: "toggle" },
+                    { nom: "GANT TAILLE S", max: 1, type: "toggle" },
+                    { nom: "GANT TAILLE M", max: 1, type: "toggle" },
+                    { nom: "GANT TAILLE L", max: 1, type: "toggle" },
+                    { nom: "GANT TAILLE XL", max: 1, type: "toggle" },
+                    { nom: "DISTRIBUTEUR ESSUIE-TOUT", max: 1, type: "toggle" },
+                    { nom: "COLLECTEUR AIGUILLES 1L", max: 1, type: "toggle" },
+                    { nom: "BRANCARD NORMALISÉ", max: 1, type: "toggle" },
                     { nom: "PLAN DUR", max: 1, type: "toggle" },
-                    { nom: "BRANCARD CUILLERE DE VSAV", max: 1, type: "toggle" },
-                    { nom: "CHAISE D'ETAGE PLIABLE (AVEC SANGLES DE PORTAGE)", max: 1, type: "toggle" },
+                    { nom: "BRANCARD CUILLÈRE", max: 1, type: "toggle" },
+                    { nom: "CHAISE D'ÉTAGE", max: 1, type: "toggle" },
                     { nom: "COUVERTURE BACTÉRIOSTATIQUE", max: 1, type: "toggle" },
-                    { nom: "SAC OXYGENOTHERAPIE", max: 1, type: "toggle" }
+                    { nom: "SAC OXYGÉNOTHÉRAPIE", max: 1, type: "toggle" }
                 ],
                 "MARQUISE": [
                     { nom: "ATTELLE CERVICO-THORACIQUE", max: 1, type: "toggle" },
-                    { nom: "LOT DE COLLIERS CERVICAUX ", max: 1, type: "toggle" },
-                    { nom: "COLLIER CERVICAUX ADULTE", max: 2, type: "number" },
-                    { nom: "COLLIER CERVICAUX PEDIATRIQUE", max: 2, type: "number" },
-                    { nom: "LOT MEMBRES SECTIONNES", max: 1, type: "toggle" },
+                    { nom: "LOT DE COLLIERS CERVICAUX", max: 1, type: "toggle" },
+                    { nom: "COLLIERS CERVICAUX ADULTE", max: 2, type: "number" },
+                    { nom: "COLLIERS CERVICAUX PÉDIATRIQUE", max: 2, type: "number" },
+                    { nom: "LOT MEMBRES SECTIONNÉS", max: 1, type: "toggle" },
                     { nom: "POCHE DE FROID", max: 4, type: "number" },
-                    { nom: "SAC MEMBRE SECTIONNES PETIT MODELE", max: 1, type: "toggle" },
-                    { nom: "SAC MEMBRE SECTIONNES GRAND MODELE", max: 1, type: "toggle" },
+                    { nom: "SAC MEMBRE SECTIONNÉ PETIT MODÈLE", max: 1, type: "toggle" },
+                    { nom: "SAC MEMBRE SECTIONNÉ GRAND MODÈLE", max: 1, type: "toggle" },
                     { nom: "PAIRE DE GANTS TAILLE 8/9", max: 1, type: "toggle" },
-                    { nom: "CHAMP STERILE", max: 1, type: "toggle" }
+                    { nom: "CHAMP STÉRILE", max: 1, type: "toggle" }
                 ],
                 "TIROIR 1 (ROUGE)": [
                     { nom: "GLUCOSE 30%", max: 3, type: "number" },
-                    { nom: "EAU STÉRILE PETIT MODELE", max: 12, type: "number" },
-                    { nom: "EAU STÉRILE 250ML", max: 2, type: "number" }, // Virgule ajoutée ici
-                    { nom: "BANDE CREPE 10cm x 4m", max: 4, type: "number" }  // Virgule ajoutée ici
+                    { nom: "EAU STÉRILE PETIT MODÈLE", max: 12, type: "number" },
+                    { nom: "EAU STÉRILE 250ML", max: 2, type: "number" },
+                    { nom: "BANDE CRÊPE 10cm x 4m", max: 4, type: "number" },
+                    { nom: "BANDE CRÊPE 5cm x 4m", max: 4, type: "number" },
+                    { nom: "ROULEAU DE SPARADRAP", max: 1, type: "toggle" },
+                    { nom: "ÉCHARPE TRIANGULAIRE", max: 4, type: "number" },
+                    { nom: "CISEAUX NON STÉRILES", max: 1, type: "toggle" },
+                    { nom: "GARROT TOURNIQUET", max: 2, type: "number" },
+                    { nom: "COMPRESSES STÉRILES (PAQUET DE 2)", max: 15, type: "number" },
+                    { nom: "COMPRESSES NON STÉRILES (PAQUET DE 100)", max: 2, type: "number" },
+                ],
+                "TIROIR 2 (BLEU)": [
+                    { nom: "MASQUES HAUTE CONCENTRATION ADULTE", max: 2, type: "number", couleur: "bleu" },
+                    { nom: "MASQUE HAUTE CONCENTRATION PÉDIATRIQUE", max: 1, type: "toggle", couleur: "rose" },
+                    { nom: "MASQUE MOYENNE CONCENTRATION ADULTE", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "MASQUE MOYENNE CONCENTRATION PÉDIATRIQUE", max: 1, type: "toggle", couleur: "rose" },
+                    { nom: "LUNETTE O2", max: 2, type: "number" },
+                    { nom: "KIT AÉROSOL ADULTE", max: 1, type: "toggle" },
+                    { nom: "KIT AÉROSOL PÉDIATRIQUE", max: 1, type: "toggle" },
+                    { nom: "CANULE DE GUÉDEL N°0", max: 2, type: "number" },
+                    { nom: "CANULE DE GUÉDEL N°00", max: 2, type: "number" },
+                    { nom: "CANULE DE GUÉDEL N°1", max: 2, type: "number" },
+                    { nom: "CANULE DE GUÉDEL N°2", max: 2, type: "number" },
+                    { nom: "CANULE DE GUÉDEL N°3", max: 2, type: "number" },
+                    { nom: "CANULE DE GUÉDEL N°4", max: 2, type: "number" },
+                ],
+                "TIROIR 3 (VERT)": [
+                    { nom: "POCHE DE FROID", max: 1, type: "number" },
+                    { nom: "NALOXONE", max: 2, type: "number" },
+                    { nom: "PENTHROX", max: 2, type: "number" },
+                    { nom: "ANAPEN", max: 1, type: "number" },
+                    { nom: "PANSEMENT COMPRESSIF (ISRAÉLIEN OU BANDAGE H)", max: 2, type: "number" },
+                    { nom: "FLACON ALCOOL 70°", max: 1, type: "toggle" },
+                    { nom: "BOÎTE FILET TUBULAIRE BRAS / JAMBE", max: 1, type: "toggle" },
+                    { nom: "BOÎTE FILET TUBULAIRE TÊTE / POITRINE", max: 1, type: "toggle" },
+                    { nom: "ALÈSE STÉRILE", max: 2, type: "number" },
+                ],
+                "TIROIR 4 (JAUNE)": [
+                    { nom: "HOUSSE MORTUAIRE", max: 1, type: "toggle" },
+                    { nom: "TUBULURE POUR ASPIRATEUR ÉLECTRIQUE", max: 2, type: "number" },
+                    { nom: "SONDE ASPIRATEUR ÉLECTRIQUE", max: 4, type: "number" },
+                    { nom: "RACCORD BIONIQUE", max: 4, type: "number" },
+                    { nom: "KIT FLACON ET SONDE ASPIRATEUR À MUCOSITÉ MANUEL", max: 1, type: "toggle" },
+                ],
+                "TIROIR 5 (NOIR)": [
+                    { nom: "DÉTERGENT DÉSINFECTANT SURFACES (DDSH)", max: 1, type: "toggle" },
+                    { nom: "SAC POUBELLE 20L DASRI", max: 1, type: "toggle" },
+                    { nom: "SAC POUBELLE 20L DÉCHETS MÉNAGERS", max: 1, type: "toggle" },
+                    { nom: "SAC POUBELLE 30L BLANC", max: 1, type: "toggle" },
+                    { nom: "LINGETTES DÉSINFECTION VSAV", max: 1, type: "toggle" },
+                ],
+                "PLACARD": [
+                    { nom: "LOT ATTELLES À DÉPRESSION", max: 1, type: "toggle" },
+                    { nom: "HARNAIS PÉDIATRIQUE", max: 1, type: "toggle" },
+                    { nom: "CHASUBLE APPRENANT", max: 2, type: "number" },
+                ],
+                "SACOCHE DSA": [
+                    { nom: "DSA", max: 1, type: "toggle" },
+                    { nom: "BATTERIE DE RECHANGE", max: 1, type: "toggle" },
+                    { nom: "RASOIRS", max: 1, type: "toggle" },
+                    { nom: "ÉLECTRODES DSA (SACHETS DE 2)", max: 2, type: "number" },
+                ],
+                "CASIER": [
+                    { nom: "LOT BRÛLURES", max: 1, type: "toggle" },
+                    { nom: "LOT ACCOUCHEMENT", max: 1, type: "toggle" },
+                    { nom: "INSUFFLATEUR ADULTE COMPLET + MASQUES T3/T4/T5", max: 1, type: "toggle" },
+                    { nom: "INSUFFLATEUR PÉDIATRIQUE COMPLET + MASQUES T0/T1/T2", max: 1, type: "toggle" },
+                    { nom: "RÉSERVOIR ASPIRATEUR MUCOSITÉ ÉLECTRIQUE", max: 1, type: "number" },
+                    { nom: "HARICOT", max: 4, type: "number" },
+                    { nom: "COUVERTURE ISOTHERME ALU", max: 4, type: "number" },
+                    { nom: "SAC HYGIÉNIQUE", max: 4, type: "number" },
+                    { nom: "SANGLE D'ARRIMAGE", max: 1, type: "toggle" },
+                    { nom: "SANGLE DE RELEVAGE 3m", max: 1, type: "toggle" },
+                    { nom: "SANGLE DE RELEVAGE 6m", max: 1, type: "toggle" },
+                    { nom: "MALLETTE A.E.S", max: 1, type: "toggle" },
+                ],
+                "SAC OXYGÉNOTHÉRAPIE": [
+                    { nom: "DÉTECTEUR CO", max: 1, type: "toggle" },
+                    { nom: "BOUTEILLE D'OXYGÈNE B5", max: 1, type: "toggle" },
+                    { nom: "COLLIER CERVICAL ADULTE", max: 1, type: "toggle" },
+                    { nom: "COLLIER CERVICAL PÉDIATRIQUE", max: 1, type: "toggle" },
+                    { nom: "COUSSIN CALE-TÊTE", max: 1, type: "toggle" },
+                    { nom: "CANULE DE GUÉDEL (N°00 - 0 - 1)", max: 3, type: "number", couleur: "rose" },
+                    { nom: "INSUFFLATEUR ENFANT + MASQUES T0, 1, 2", max: 1, type: "toggle", couleur: "rose" },
+                    { nom: "KIT AÉROSOL ENFANT", max: 1, type: "toggle", couleur: "rose" },
+                    { nom: "MASQUE O2 ENFANT MOYENNE CONCENTRATION", max: 1, type: "toggle", couleur: "rose" },
+                    { nom: "MASQUE O2 ENFANT HAUTE CONCENTRATION", max: 1, type: "toggle", couleur: "rose" },
+                    { nom: "CANULE DE GUÉDEL (N°3 - 4 - 5)", max: 3, type: "number", couleur: "bleu" },
+                    { nom: "INSUFFLATEUR ADULTE + MASQUES T3, 4, 5", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "KIT AÉROSOL ADULTE", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "MASQUE O2 ADULTE MOYENNE CONCENTRATION", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "MASQUE O2 ADULTE HAUTE CONCENTRATION", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "LUNETTE O2", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "ASPIRATEUR À MUCOSITÉS MANUEL + FLACON + SONDE", max: 1, type: "toggle" },
+                    { nom: "LUNETTES DE PROTECTION", max: 4, type: "number" },
+                    { nom: "MASQUES FFP2", max: 4, type: "number" },
+                    { nom: "MASQUE CHIRURGICAL", max: 1, type: "toggle" },
+                    { nom: "COUVERTURE ISOTHERME ALU", max: 5, type: "number" },
                 ],
                 "SACOCHE EXAMEN": [
-                    { nom: "LECTEUR GLYCÉMIE", max: 1, type: "toggle" },
-                    { nom: "TENSIOMÈTRE", max: 1, type: "toggle" },
-                    { nom: "COUVERTURE ISOTHERME", max: 5, type: "number" }
+                    { nom: "LECTEUR GLYCÉMIE (Kit complet)", max: 1, type: "toggle", couleur: "vert" },
+                    { nom: "GLUCOSE 30% , 10ml", max: 2, type: "number", couleur: "vert" },
+                    { nom: "COLLECTEUR AIGUILLE PETIT MODÈLE", max: 1, type: "toggle", couleur: "vert" },
+                    { nom: "OXYMÈTRE DE POULS", max: 1, type: "toggle", couleur: "vert" },
+                    { nom: "RÉGLETTE ÉVALUATION DOULEUR (EVN)", max: 1, type: "toggle", couleur: "vert" },
+                    { nom: "COMPRESSES STÉRILES (PAQUET DE 2)", max: 2, type: "number", couleur: "vert" },
+                    { nom: "THERMOMÈTRE + ÉTUIS USAGE UNIQUE", max: 1, type: "toggle", couleur: "vert" },
+                    { nom: "SOLUTION HYDRO-ALCOOLIQUE", max: 1, type: "toggle", couleur: "vert" },
+                    { nom: "TENSIOMÈTRE MANUEL + 3 BRASSARDS", max: 1, type: "toggle", couleur: "noir" },
+                    { nom: "STÉTHOSCOPE", max: 1, type: "toggle", couleur: "noir" },
+                    { nom: "BANDE CRÊPE (10cm x 4m)", max: 2, type: "number", couleur: "bleu" },
+                    { nom: "BANDE CRÊPE (5cm x 4m)", max: 2, type: "number", couleur: "bleu" },
+                    { nom: "EAU STÉRILE PETIT MODÈLE", max: 1, type: "number", couleur: "bleu" },
+                    { nom: "ÉCHARPE TRIANGULAIRE", max: 2, type: "number", couleur: "bleu" },
+                    { nom: "PANSEMENT HYDROGEL 20 x 20cm", max: 1, type: "number", couleur: "bleu" },
+                    { nom: "CISEAUX NON STÉRILES", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "PANSEMENT ABSORBANT", max: 1, type: "number", couleur: "bleu" },
+                    { nom: "COMPRESSES STÉRILES (PAQUET DE 2)", max: 10, type: "number", couleur: "bleu" },
+                    { nom: "PINCE À ÉCHARDE", max: 1, type: "number", couleur: "bleu" },
+                    { nom: "SPARADRAP", max: 1, type: "toggle", couleur: "bleu" },
+                    { nom: "SAC POUBELLE DASRI", max: 1, type: "number", couleur: "bleu" },
+                    { nom: "COUVERTURE ISOTHERME ALU", max: 5, type: "number", couleur: "rouge" },
+                    { nom: "GARROT TOURNIQUET", max: 2, type: "number", couleur: "rouge" },
+                    { nom: "PANSEMENT HÉMOSTATIQUE (CHITO-SAM)", max: 1, type: "number", couleur: "rouge" },
+                    { nom: "PANSEMENT COMPRESSIF (ISRAÉLIEN / H)", max: 2, type: "number", couleur: "rouge" },
+                    { nom: "COMPRESSES STÉRILES (PAQUET DE 2)", max: 2, type: "number", couleur: "rouge" },
+                    { nom: "SPARADRAP", max: 1, type: "toggle", couleur: "rouge" },
                 ]
             },
             "CTU": {
@@ -108,13 +255,26 @@
         const container = document.getElementById('accordionContainer');
         const selector = document.getElementById('vehicleSelector');
         const btnVehicleName = document.getElementById('btnVehicleName');
+        const commentBox = document.getElementById('globalComment');
+        const modal = document.getElementById('summaryModal');
+        const summaryContent = document.getElementById('summaryContent');
+
+        function updateCategoryCount(detailsElement) {
+            const inputs = detailsElement.querySelectorAll('input[data-item="true"]');
+            const badge = detailsElement.querySelector('.category-badge');
+            let filled = 0;
+            inputs.forEach(input => {
+                if (input.type === 'checkbox' && input.checked) filled++;
+                else if (input.type === 'number' && input.value > 0) filled++;
+            });
+            badge.innerText = `${filled} / ${inputs.length}`;
+            badge.className = `category-badge px-2 py-0.5 rounded-full text-[10px] font-black ${filled === inputs.length ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`;
+        }
 
         function renderInventory(vehicleKey) {
             container.innerHTML = ""; 
-            const data = toutesLesDonnees[vehicleKey];
-            if (!data) return; 
-
             btnVehicleName.innerText = vehicleKey;
+            const data = toutesLesDonnees[vehicleKey];
 
             for (const [categorie, items] of Object.entries(data)) {
                 const details = document.createElement('details');
@@ -122,42 +282,78 @@
                 
                 details.innerHTML = `
                     <summary class="list-none flex justify-between items-center p-5 cursor-pointer font-bold text-slate-800 uppercase text-sm tracking-wide">
-                        ${categorie}
+                        <div class="flex items-center gap-3">
+                            ${categorie}
+                            <span class="category-badge bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[10px] font-black">0 / ${items.length}</span>
+                        </div>
                         <span class="text-red-600 group-open:rotate-180 transition-transform">▼</span>
                     </summary>
                     <div class="border-t border-slate-100 bg-slate-50">
-                        ${items.map(item => `
+                        ${items.map(item => {
+                            let textClass = "text-slate-600 font-bold";
+                            if (item.couleur === "rose") textClass = "text-pink-500 font-black";
+                            else if (item.couleur === "bleu") textClass = "text-blue-600 font-black";
+                            else if (item.couleur === "vert") textClass = "text-green-600 font-black";
+                            else if (item.couleur === "rouge") textClass = "text-red-600 font-black";
+                            else if (item.couleur === "noir") textClass = "text-slate-900 font-black";
+                            
+                            const inputName = item.nom.replace(/[^a-zA-Z0-9]/g, '_');
+
+                            return `
                             <div class="flex items-center justify-between p-4 border-b border-slate-100 last:border-0">
-                                <span class="text-xs font-bold text-slate-600 uppercase w-1/2">${item.nom}</span>
+                                <span class="text-xs uppercase w-1/2 ${textClass}">${item.nom}</span>
                                 ${item.type === "toggle" 
                                     ? `<label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" class="sr-only peer" data-name="${item.nom}">
+                                        <input type="checkbox" name="${inputName}" data-item="true" data-label="${item.nom}" class="sr-only peer" onchange="updateCategoryCount(this.closest('details'))">
                                         <div class="w-11 h-6 bg-slate-200 rounded-full peer-checked:bg-green-500 transition-colors"></div>
                                         <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-5"></div>
                                       </label>`
                                     : `<div class="flex items-center bg-white p-1 rounded-lg border border-slate-200">
-                                        <input type="number" inputmode="numeric" placeholder="0" class="w-8 bg-transparent text-center font-bold text-red-600 outline-none" data-name="${item.nom}">
+                                        <input type="number" name="${inputName}" data-item="true" data-label="${item.nom}" data-max="${item.max}" inputmode="numeric" placeholder="0" 
+                                            class="w-8 bg-transparent text-center font-bold text-red-600 outline-none" 
+                                            oninput="updateCategoryCount(this.closest('details'))">
                                         <span class="text-slate-400 text-[10px] font-bold px-1">/ ${item.max}</span>
                                       </div>`
                                 }
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
                 `;
                 container.appendChild(details);
             }
         }
 
-        selector.addEventListener('change', (e) => {
-            renderInventory(e.target.value);
-        });
+        // NOUVELLES FONCTIONS POUR LE BILAN
+        function genererBilan() {
+            const inputs = document.querySelectorAll('input[data-item="true"]');
+            let listeManquants = [];
 
+            inputs.forEach(input => {
+                if (input.type === 'checkbox' && !input.checked) {
+                    listeManquants.push(`<div class="flex items-center gap-2 text-red-600 font-bold"><span class="w-2 h-2 bg-red-600 rounded-full"></span> ${input.dataset.label} (ABSENT)</div>`);
+                } else if (input.type === 'number') {
+                    const val = parseInt(input.value) || 0;
+                    const max = parseInt(input.dataset.max);
+                    if (val < max) {
+                        listeManquants.push(`<div class="flex items-center gap-2 text-orange-600 font-bold"><span class="w-2 h-2 bg-orange-500 rounded-full"></span> ${input.dataset.label} (${val} / ${max})</div>`);
+                    }
+                }
+            });
+
+            if (listeManquants.length === 0) {
+                summaryContent.innerHTML = `<div class="text-green-600 font-black text-center py-10 uppercase">✅ Tout est complet !</div>`;
+            } else {
+                summaryContent.innerHTML = `<p class="text-slate-400 text-[10px] uppercase mb-2">Matériel manquant ou incomplet :</p>` + listeManquants.join('');
+            }
+            modal.classList.add('active');
+        }
+
+        function fermerBilan() { modal.classList.remove('active'); }
+        function envoyerFormulaire() { document.getElementById('inventoryForm').submit(); }
+
+        selector.addEventListener('change', (e) => renderInventory(e.target.value));
         renderInventory("VSAV");
 
-        document.getElementById('inventoryForm').onsubmit = (e) => {
-            e.preventDefault();
-            alert("Inventaire de " + selector.value + " validé !");
-        };
     </script>
 </body>
 </html>
