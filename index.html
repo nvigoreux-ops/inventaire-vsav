@@ -2,12 +2,14 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdn.tailwindcss.com"></script>
     <title>Inventaire Matériel - Caserne</title>
     <style>
         #summaryModal.active { display: flex; }
         .loading-overlay { display: flex; position: fixed; inset: 0; background: white; z-index: 100; align-items: center; justify-content: center; flex-direction: column; }
+        /* Empêche la sélection de texte sur le bouton admin pour éviter les bugs visuels */
+        #adminTrigger { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
     </style>
 </head>
 <body class="bg-slate-100 pb-24 font-sans">
@@ -18,7 +20,7 @@
     </div>
 
     <div class="bg-red-700 text-white p-5 shadow-lg sticky top-0 z-50 flex flex-col items-center">
-        <h1 id="adminTrigger" class="text-lg font-black uppercase tracking-tighter italic cursor-pointer select-none">
+        <h1 id="adminTrigger" class="text-lg font-black uppercase tracking-tighter italic cursor-pointer">
             🚒 GESTION DES INVENTAIRES
         </h1>
         
@@ -65,33 +67,24 @@
     <script>
         const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzwOVt0S1wuVtgDqBOe0aWfsn80dKsN2EwQsKh4XCGjX4lkada4TexHiP8PQuNOeg1YIA/exec";
         let toutesLesDonnees = {};
-        let adminClicks = 0;
 
-        // 1. RÉCUPÉRATION DES DONNÉES DEPUIS GOOGLE
         async function chargerDonnees() {
             try {
                 const response = await fetch(GOOGLE_SHEET_URL);
                 const rawData = await response.json();
-                
-                // On transforme le tableau plat en format structuré par véhicule et catégorie
                 const structure = {};
                 rawData.forEach(item => {
                     if (!structure[item.Vehicule]) structure[item.Vehicule] = {};
                     if (!structure[item.Vehicule][item.Categorie]) structure[item.Vehicule][item.Categorie] = [];
-                    
                     structure[item.Vehicule][item.Categorie].push({
-                        nom: item.Nom,
-                        max: item.Max,
-                        type: item.Type,
-                        couleur: item.Couleur
+                        nom: item.Nom, max: item.Max, type: item.Type, couleur: item.Couleur
                     });
                 });
-
                 toutesLesDonnees = structure;
                 document.getElementById('loader').style.display = 'none';
                 renderInventory(document.getElementById('vehicleSelector').value);
             } catch (error) {
-                alert("Erreur de chargement des données Google Sheets. Vérifiez votre connexion.");
+                alert("Erreur de chargement des données Google Sheets.");
                 console.error(error);
             }
         }
@@ -122,7 +115,6 @@
             for (const [categorie, items] of Object.entries(data)) {
                 const details = document.createElement('details');
                 details.className = "group bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden open:shadow-lg transition-all";
-                
                 details.innerHTML = `
                     <summary class="list-none flex justify-between items-center p-5 cursor-pointer font-bold text-slate-800 uppercase text-sm tracking-wide">
                         <div class="flex items-center gap-3">
@@ -140,9 +132,7 @@
                             else if (c === "vert") textClass = "text-green-600 font-black";
                             else if (c === "rouge") textClass = "text-red-600 font-black";
                             else if (c === "noir") textClass = "text-slate-900 font-black";
-                            
                             const inputName = item.nom.replace(/[^a-zA-Z0-9]/g, '_');
-
                             return `
                             <div class="flex items-center justify-between p-4 border-b border-slate-100 last:border-0">
                                 <span class="text-xs uppercase w-1/2 ${textClass}">${item.nom}</span>
@@ -159,10 +149,9 @@
                                         <span class="text-slate-400 text-[10px] font-bold px-1">/ ${item.max}</span>
                                       </div>`
                                 }
-                            </div>
-                        `}).join('')}
-                    </div>
-                `;
+                            </div>`;
+                        }).join('')}
+                    </div>`;
                 container.appendChild(details);
             }
         }
@@ -181,31 +170,37 @@
                     }
                 }
             });
-            const content = document.getElementById('summaryContent');
-            content.innerHTML = listeManquants.length === 0 ? `<div class="text-green-600 font-black text-center py-10">✅ INVENTAIRE COMPLET</div>` : listeManquants.join('');
+            document.getElementById('summaryContent').innerHTML = listeManquants.length === 0 ? `<div class="text-green-600 font-black text-center py-10">✅ INVENTAIRE COMPLET</div>` : listeManquants.join('');
             modal.classList.add('active');
         }
 
         function fermerBilan() { modal.classList.remove('active'); }
         function envoyerFormulaire() { document.getElementById('inventoryForm').submit(); }
 
-        // GESTION DU MENU ADMIN (5 clics sur le titre)
-        document.getElementById('adminTrigger').addEventListener('click', () => {
-            adminClicks++;
-            if (adminClicks >= 5) {
+        // --- NOUVELLE GESTION ADMIN : APPUI LONG 2 SECONDES ---
+        let adminTimer;
+        const trigger = document.getElementById('adminTrigger');
+
+        function startTimer() {
+            adminTimer = setTimeout(() => {
                 const code = prompt("Code Administrateur :");
                 if (code === "4572") {
-                    // Remplace par le lien direct vers ton TABLEUR Google Sheets
-                    window.open("https://docs.google.com/spreadsheets/d/1ugqT4Qjo2nfBgZF79cxsMT-bWzIYXirfMoAAzOsInYk/edit?gid=0#gid=0");
+                    window.open("https://docs.google.com/spreadsheets/d/1ugqT4Qjo2nfBgZF79cxsMT-bWzIYXirfMoAAzOsInYk/edit?gid=0#gid=0", "_blank");
+                } else if (code !== null) {
+                    alert("Code incorrect");
                 }
-                adminClicks = 0;
-            }
-            setTimeout(() => { adminClicks = 0; }, 3000); // Reset après 3 sec
-        });
+            }, 2000);
+        }
+
+        function stopTimer() { clearTimeout(adminTimer); }
+
+        trigger.addEventListener('touchstart', (e) => { startTimer(); });
+        trigger.addEventListener('touchend', stopTimer);
+        trigger.addEventListener('mousedown', startTimer);
+        trigger.addEventListener('mouseup', stopTimer);
+        trigger.addEventListener('contextmenu', e => e.preventDefault()); // Empêche le menu clic droit
 
         selector.addEventListener('change', (e) => renderInventory(e.target.value));
-        
-        // Lancer le chargement au démarrage
         chargerDonnees();
     </script>
 </body>
