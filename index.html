@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Ajout des scripts Firebase pour le direct -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
     <title>Inventaire Matériel - Caserne</title>
     <style>
         #summaryModal.active { display: flex; }
@@ -38,7 +43,8 @@
 
             <div class="mt-8 mb-6">
                 <label class="block text-xs font-black text-slate-500 uppercase mb-2 ml-2">Observations / Matériel Manquant :</label>
-                <textarea id="globalComment" name="OBSERVATIONS" rows="3" 
+                <!-- Ajout de l'événement oninput pour synchroniser le texte en direct -->
+                <textarea id="globalComment" name="OBSERVATIONS" rows="3" oninput="updateObsFirebase(this)"
                     class="w-full rounded-2xl border-slate-200 border p-4 text-sm shadow-sm focus:ring-2 focus:ring-red-600 outline-none transition-all bg-white"
                     placeholder="RAS, matériel manquant, péremptions..."></textarea>
             </div>
@@ -65,6 +71,15 @@
     </div>
 
     <script>
+        // CONFIGURATION FIREBASE (La magie du direct)
+        const firebaseConfig = {
+            databaseURL: "https://inventaire-b4ac2-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let currentDbRef = null;
+
+        // CONFIGURATION GOOGLE SHEETS (La liste du matériel)
         const GOOGLE_SHEET_URL = "https://script.google.com/macros/s/AKfycbzwOVt0S1wuVtgDqBOe0aWfsn80dKsN2EwQsKh4XCGjX4lkada4TexHiP8PQuNOeg1YIA/exec";
         let toutesLesDonnees = {};
 
@@ -94,7 +109,61 @@
         const btnVehicleName = document.getElementById('btnVehicleName');
         const modal = document.getElementById('summaryModal');
 
+        // FONCTIONS DE MISE À JOUR FIREBASE
+        function updateItemFirebase(element) {
+            const vehicleKey = selector.value;
+            const value = element.type === 'checkbox' ? element.checked : element.value;
+            // On envoie la modification à Firebase
+            db.ref('inventaire_en_cours/' + vehicleKey + '/' + element.name).set(value);
+            // On met à jour le compteur du tiroir localement
+            updateCategoryCount(element.closest('details'));
+        }
+
+        function updateObsFirebase(element) {
+            const vehicleKey = selector.value;
+            db.ref('inventaire_en_cours/' + vehicleKey + '/OBSERVATIONS').set(element.value);
+        }
+
+        function activerSynchro(vehicleKey) {
+            // Si on écoutait un autre véhicule avant, on coupe la connexion
+            if (currentDbRef) currentDbRef.off(); 
+            
+            // On se connecte au nouveau véhicule
+            currentDbRef = db.ref('inventaire_en_cours/' + vehicleKey);
+            
+            // À chaque fois que quelqu'un d'autre modifie Firebase, on met à jour l'écran
+            currentDbRef.on('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                const inputs = document.querySelectorAll('input[data-item="true"]');
+                
+                inputs.forEach(input => {
+                    const valFirebase = data[input.name];
+                    if (input.type === 'checkbox') {
+                        const isChecked = valFirebase === true;
+                        if (input.checked !== isChecked) {
+                            input.checked = isChecked;
+                            updateCategoryCount(input.closest('details'));
+                        }
+                    } else if (input.type === 'number') {
+                        const numVal = valFirebase !== undefined ? valFirebase : "";
+                        // On ne modifie la case que si le pompier n'est pas déjà en train de taper dedans
+                        if (input.value !== String(numVal) && document.activeElement !== input) {
+                            input.value = numVal;
+                            updateCategoryCount(input.closest('details'));
+                        }
+                    }
+                });
+
+                // Synchro du champ observations
+                const obs = document.getElementById('globalComment');
+                if (data['OBSERVATIONS'] !== undefined && obs.value !== data['OBSERVATIONS'] && document.activeElement !== obs) {
+                    obs.value = data['OBSERVATIONS'];
+                }
+            });
+        }
+
         function updateCategoryCount(detailsElement) {
+            if (!detailsElement) return;
             const inputs = detailsElement.querySelectorAll('input[data-item="true"]');
             const badge = detailsElement.querySelector('.category-badge');
             let filled = 0;
@@ -109,6 +178,10 @@
         function renderInventory(vehicleKey) {
             container.innerHTML = ""; 
             btnVehicleName.innerText = vehicleKey;
+            
+            // On vide aussi le champ globalComment quand on change de véhicule
+            document.getElementById('globalComment').value = "";
+            
             const data = toutesLesDonnees[vehicleKey];
             if (!data) return;
 
@@ -138,14 +211,14 @@
                                 <span class="text-xs uppercase w-1/2 ${textClass}">${item.nom}</span>
                                 ${item.type === "toggle" 
                                     ? `<label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" name="${inputName}" data-item="true" data-label="${item.nom}" class="sr-only peer" onchange="updateCategoryCount(this.closest('details'))">
+                                        <input type="checkbox" name="${inputName}" data-item="true" data-label="${item.nom}" class="sr-only peer" onchange="updateItemFirebase(this)">
                                         <div class="w-11 h-6 bg-slate-200 rounded-full peer-checked:bg-green-500 transition-colors"></div>
                                         <div class="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform peer-checked:translate-x-5"></div>
                                       </label>`
                                     : `<div class="flex items-center bg-white p-1 rounded-lg border border-slate-200">
                                         <input type="number" name="${inputName}" data-item="true" data-label="${item.nom}" data-max="${item.max}" inputmode="numeric" placeholder="0" 
                                             class="w-8 bg-transparent text-center font-bold text-red-600 outline-none" 
-                                            oninput="updateCategoryCount(this.closest('details'))">
+                                            oninput="updateItemFirebase(this)">
                                         <span class="text-slate-400 text-[10px] font-bold px-1">/ ${item.max}</span>
                                       </div>`
                                 }
@@ -154,6 +227,9 @@
                     </div>`;
                 container.appendChild(details);
             }
+            
+            // On lance la synchronisation direct !
+            activerSynchro(vehicleKey);
         }
 
         function genererBilan() {
@@ -175,9 +251,18 @@
         }
 
         function fermerBilan() { modal.classList.remove('active'); }
-        function envoyerFormulaire() { document.getElementById('inventoryForm').submit(); }
+        
+        function envoyerFormulaire() { 
+            // On stoppe le direct pour que l'écran ne clignote pas
+            if (currentDbRef) currentDbRef.off();
+            
+            // On efface les données de ce véhicule dans Firebase pour le prochain inventaire
+            db.ref('inventaire_en_cours/' + selector.value).remove()
+                .then(() => document.getElementById('inventoryForm').submit())
+                .catch(() => document.getElementById('inventoryForm').submit());
+        }
 
-        // --- NOUVELLE GESTION ADMIN : APPUI LONG 2 SECONDES ---
+        // --- GESTION ADMIN : APPUI LONG 2 SECONDES ---
         let adminTimer;
         const trigger = document.getElementById('adminTrigger');
 
@@ -198,7 +283,7 @@
         trigger.addEventListener('touchend', stopTimer);
         trigger.addEventListener('mousedown', startTimer);
         trigger.addEventListener('mouseup', stopTimer);
-        trigger.addEventListener('contextmenu', e => e.preventDefault()); // Empêche le menu clic droit
+        trigger.addEventListener('contextmenu', e => e.preventDefault());
 
         selector.addEventListener('change', (e) => renderInventory(e.target.value));
         chargerDonnees();
